@@ -16,28 +16,54 @@ import time
 import os
 from ppk2_api.ppk2_api import PPK2_MP as PPK2_API
 
+def detect_ppk2_port():
+    """
+    Attempts to open each device returned by PPK2_API.list_devices().
+    If we can successfully call a PPK2-specific function (e.g., get_modifiers())
+    without error, we assume it's the correct port.
+
+    Returns:
+        A string with the device path (e.g. '/dev/ttyACM1') if found;
+        otherwise None if no valid PPK2 device is detected.
+    """
+    candidate_ports = PPK2_API.list_devices()
+    print("Candidate PPK2 ports:", candidate_ports)
+
+    if not candidate_ports:
+        print("No PPK2 devices found.")
+        return None
+
+    for dev in candidate_ports:
+        print(f"Testing potential PPK2 device at: {dev}")
+        try:
+            # Try opening the device in a short-lived instance
+            temp_ppk2 = PPK2_API(
+                dev,
+                buffer_max_size_seconds=1,
+                buffer_chunk_seconds=0.01,
+                timeout=1,
+                write_timeout=1,
+                exclusive=True
+            )
+            # This call will fail if 'dev' is not actually a PPK2
+            temp_ppk2.get_modifiers()
+
+            # If we got here without an exception, 'dev' is valid.
+            print(f"Detected PPK2 at {dev}")
+            return dev
+
+        except Exception as e:
+            # If something went wrong, assume it's not the correct port
+            print(f"Port {dev} failed to open as PPK2. Error: {e}")
+            # Just move on to the next candidate
+            continue
+
+    # If we tried everything and did not succeed, return None
+    return None
+
 def get_formatted_time():
     """Returns the current local time as a string in 'YYYY-MM-DD HH:MM:SS' format."""
     return time.strftime("%Y-%m-%d %H:%M:%S")
-
-def select_ppk2_port():
-    """
-    Lists available PPK2 devices and returns the first match for '/dev/ttyACM0'.
-    Raises SystemExit if no suitable port is found.
-    """
-    ppk2s = PPK2_API.list_devices()
-    print("Detected PPK2 devices:", ppk2s)
-
-    if not ppk2s:
-        raise SystemExit("No PPK2 found!")
-
-    # Decide which device to pick, for example /dev/ttyACM0
-    for dev in ppk2s:
-        if "/dev/ttyACM0" in dev:
-            print(f"Using PPK2 at {dev}")
-            return dev
-
-    raise SystemExit("Could not find a valid PPK2 port (e.g., '/dev/ttyACM0').")
 
 def create_new_csv_file(data_folder, file_prefix):
     """
@@ -54,8 +80,14 @@ def create_new_csv_file(data_folder, file_prefix):
     return csvfile, csv_writer
 
 def main():
-    # Prepare for PPK2 device
-    ppk2_port = select_ppk2_port()
+    # Dynamically detect the correct PPK2 port
+    ppk2_port = detect_ppk2_port()
+    if ppk2_port is None:
+        print("Could not detect a valid PPK2 port. Exiting.")
+        return
+
+    print(f"Using PPK2 at {ppk2_port}")
+
     ppk2_test = PPK2_API(
         ppk2_port,
         buffer_max_size_seconds=1,
