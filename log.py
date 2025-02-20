@@ -19,13 +19,30 @@ from ppk2_api.ppk2_api import PPK2_MP as PPK2_API
 def get_formatted_time():
     return time.strftime("%Y-%m-%d %H:%M:%S")
 
-ppk2s_connected = PPK2_API.list_devices()
-if len(ppk2s_connected) == 1:
-    ppk2_port = ppk2s_connected[0]
-    print(f'Found PPK2 at {ppk2_port}')
-else:
-    print(f'Too many connected PPK2\'s: {ppk2s_connected}')
+############################
+### Getting the PPK2 port ##
+############################
+ppk2s = PPK2_API.list_devices()
+print(ppk2s)  # Show all connected PPK2 ports
+
+if not ppk2s:
+    print("No PPK2 found!")
     exit()
+
+# Decide which device to pick, for example /dev/ttyACM0
+ppk2_port = None
+for dev in ppk2s:
+    if "/dev/ttyACM0" in dev:
+        ppk2_port = dev
+        break
+
+if not ppk2_port:
+    print("Could not pick a valid PPK2 port.")
+    exit()
+
+print(f"Using PPK2 at {ppk2_port}")
+############################
+############################
 
 ppk2_test = PPK2_API(ppk2_port, buffer_max_size_seconds=1, buffer_chunk_seconds=0.01, timeout=1, write_timeout=1,
                      exclusive=True)

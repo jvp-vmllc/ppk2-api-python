@@ -9,6 +9,9 @@ The basic ampere mode sequence is:
 import time
 from ppk2_api.ppk2_api import PPK2_API
 
+############################
+### Getting the PPK2 port ##
+############################
 ppk2s = PPK2_API.list_devices()
 print(ppk2s)  # Show all connected PPK2 ports
 
@@ -28,7 +31,8 @@ if not ppk2_port:
     exit()
 
 print(f"Using PPK2 at {ppk2_port}")
-ppk = PPK2_API(ppk2_port)
+############################
+############################
 
 ppk2_test = PPK2_API(ppk2_port, timeout=1, write_timeout=1, exclusive=True)
 ppk2_test.get_modifiers()
