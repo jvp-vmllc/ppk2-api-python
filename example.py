@@ -9,14 +9,14 @@ The basic ampere mode sequence is:
 import time
 from ppk2_api.ppk2_api import PPK2_API
 
-ppk2s_connected = PPK2_API.list_devices()
-print(ppk2s)
+ppk2s = PPK2_API.list_devices()
+print(ppk2s)  # Show all connected PPK2 ports
 
 if not ppk2s:
     print("No PPK2 found!")
     exit()
 
-# Decide which device to pick, typically at /dev/ttyACM0
+# Decide which device to pick, for example /dev/ttyACM0
 ppk2_port = None
 for dev in ppk2s:
     if "/dev/ttyACM0" in dev:
@@ -26,6 +26,9 @@ for dev in ppk2s:
 if not ppk2_port:
     print("Could not pick a valid PPK2 port.")
     exit()
+
+print(f"Using PPK2 at {ppk2_port}")
+ppk = PPK2_API(ppk2_port)
 
 ppk2_test = PPK2_API(ppk2_port, timeout=1, write_timeout=1, exclusive=True)
 ppk2_test.get_modifiers()
