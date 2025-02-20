@@ -53,9 +53,8 @@ def detect_ppk2_port():
             return dev
 
         except Exception as e:
-            # If something went wrong, assume it's not the correct port
+            # If something went wrong, assume it's not the correct port, Just move on to the next candidate
             print(f"Port {dev} failed to open as PPK2. Error: {e}")
-            # Just move on to the next candidate
             continue
 
     # If we tried everything and did not succeed, return None

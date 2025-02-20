@@ -1,3 +1,16 @@
+
+"""
+******************************************************************************
+* @file         : log_mqtt.py
+* @brief        : Log and do MQTT at every X interval
+*
+* Copyright    : Vision Metering, LLC
+* Date         : February 20, 2025
+* Author       : J.P.
+* Version      : 0.0.1
+******************************************************************************
+"""
+
 import csv
 import time
 import os
@@ -35,15 +48,19 @@ def detect_ppk2_port():
                 write_timeout=1,
                 exclusive=True
             )
+            # This call will fail if 'dev' is not actually a PPK2
             temp_ppk2.get_modifiers()
 
+            # If we got here without an exception, 'dev' is valid.
             print(f"Detected PPK2 at {dev}")
             return dev
 
         except Exception as e:
+            # If something went wrong, assume it's not the correct port, Just move on to the next candidate
             print(f"Port {dev} failed to open as PPK2. Error: {e}")
             continue
 
+    # If we tried everything and did not succeed, return None
     return None
 
 def get_formatted_time():
@@ -69,7 +86,7 @@ def create_new_csv_file(data_folder, file_prefix):
 # -----------------------------
 def mqtt_publisher(data_queue):
     """
-    Continuously waits for new 'consumption' values on data_queue and publishes
+    Waits for new 'consumption' values on data_queue and publishes
     them via mosquitto_pub. If it receives None, it exits.
     """
     while True:
@@ -152,6 +169,10 @@ def main():
     publisher_thread = threading.Thread(target=mqtt_publisher, args=(data_queue,), daemon=True)
     publisher_thread.start()
 
+    # We only want to send data to MQTT every X seconds
+    SEND_INTERVAL = 5.0  # in seconds
+    last_send_time = time.time()
+
     try:
         while True:
             elapsed_time = time.time() - start_time
@@ -176,10 +197,12 @@ def main():
                 csv_writer.writerow([f"{elapsed_time:.2f}", real_time_str, f"{average_current:.3f}"])
                 print(f"Elapsed: {elapsed_time:.0f}s | Time: {real_time_str} | Avg Current: {average_current:.3f} uA")
 
-                # ----------------------------------------------------------
-                # 5. Pass data to the MQTT publisher thread
-                # ----------------------------------------------------------
-                data_queue.put(average_current)
+                # ----------------------------------------------
+                # Only queue data every SEND_INTERVAL seconds
+                # ----------------------------------------------
+                if (time.time() - last_send_time) >= SEND_INTERVAL:
+                    data_queue.put(average_current)
+                    last_send_time = time.time()
 
             # Sleep to approximate 1-second sampling intervals
             sleep_duration = max(0, sampling_interval_seconds - (time.time() - start_time) % sampling_interval_seconds)
