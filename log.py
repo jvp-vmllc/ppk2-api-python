@@ -14,13 +14,10 @@
 import csv
 import time
 import os
-
 from ppk2_api.ppk2_api import PPK2_MP as PPK2_API
 
 def get_formatted_time():
-    """
-    Returns the current local time as a string in "YYYY-MM-DD HH:MM:SS" format.
-    """
+    """Returns the current local time as a string in 'YYYY-MM-DD HH:MM:SS' format."""
     return time.strftime("%Y-%m-%d %H:%M:%S")
 
 def select_ppk2_port():
@@ -57,9 +54,8 @@ def create_new_csv_file(data_folder, file_prefix):
     return csvfile, csv_writer
 
 def main():
+    # Prepare for PPK2 device
     ppk2_port = select_ppk2_port()
-    
-    # Initialize PPK2
     ppk2_test = PPK2_API(
         ppk2_port,
         buffer_max_size_seconds=1,
@@ -71,7 +67,7 @@ def main():
     ppk2_test.get_modifiers()
     ppk2_test.set_source_voltage(3300)
 
-    # Prepare folders and file naming
+    # Folder and file settings
     data_folder = "data_ppk"
     os.makedirs(data_folder, exist_ok=True)
     file_prefix = 'log_ppk'
@@ -83,30 +79,29 @@ def main():
     # Open the first CSV file
     csvfile, csv_writer = create_new_csv_file(data_folder, file_prefix)
 
+    # Setup measurement
+    ppk2_test.use_source_meter()
+    ppk2_test.toggle_DUT_power("ON")
+    ppk2_test.start_measuring()
+
+    start_time = time.time()
+    next_rotation = start_time + new_file_interval
+
     try:
-        # Start measuring
-        ppk2_test.use_source_meter()
-        ppk2_test.toggle_DUT_power("ON")
-        ppk2_test.start_measuring()
-
-        start_time = time.time()
-        next_rotation = start_time + new_file_interval
-
         while True:
             elapsed_time = time.time() - start_time
             if elapsed_time >= total_seconds:
-                break  # we've reached the total runtime
+                # Stop after the total runtime
+                break
 
-            # Check if it's time to rotate the file
+            # File rotation check
             now = time.time()
             if now >= next_rotation:
-                # Close the old file
                 csvfile.close()
-                # Open a new file
                 csvfile, csv_writer = create_new_csv_file(data_folder, file_prefix)
                 next_rotation += new_file_interval
 
-            # Get data from PPK2
+            # Grab data from PPK2
             read_data = ppk2_test.get_data()
             if read_data:
                 samples, raw_digital = ppk2_test.get_samples(read_data)
@@ -114,30 +109,20 @@ def main():
 
                 real_time_str = get_formatted_time()
                 csv_writer.writerow([f"{elapsed_time:.2f}", real_time_str, f"{average_current:.3f}"])
-                print(
-                    f"Elapsed: {elapsed_time:.0f}s | "
-                    f"Time: {real_time_str} | "
-                    f"Avg Current: {average_current:.3f} uA"
-                )
+                print(f"Elapsed: {elapsed_time:.0f}s | Time: {real_time_str} | Avg Current: {average_current:.3f} uA")
 
-            # Sleep until the next second boundary to achieve ~1 sample/sec
+            # Sleep to approximate 1-second sampling intervals
             sleep_duration = max(0, sampling_interval_seconds - (time.time() - start_time) % sampling_interval_seconds)
             time.sleep(sleep_duration)
 
-        # Stop measuring and power off
-        ppk2_test.toggle_DUT_power("OFF")
-        ppk2_test.stop_measuring()
-
     except KeyboardInterrupt:
-        print("Program terminated by user (KeyboardInterrupt).")
-
-    except Exception as e:
-        print(f"An error occurred: {e}")
+        print("KeyboardInterrupt detected. Exiting gracefully...")
 
     finally:
-        # Always clean up
+        # Always make sure we turn off DUT power and stop measuring
         ppk2_test.toggle_DUT_power("OFF")
         ppk2_test.stop_measuring()
+        # Close CSV file if open
         if csvfile and not csvfile.closed:
             csvfile.close()
 
